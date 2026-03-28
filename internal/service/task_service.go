@@ -26,9 +26,15 @@ type TaskFilter struct {
 	Search   string
 }
 
+const taskColumns = `id, board_id, column_id, title, description, priority, labels, position, created_at, updated_at, completed_at, due_date`
+
+func scanTask(row interface{ Scan(...any) error }, t *model.Task) error {
+	return row.Scan(&t.ID, &t.BoardID, &t.ColumnID, &t.Title, &t.Description,
+		&t.Priority, &t.Labels, &t.Position, &t.CreatedAt, &t.UpdatedAt, &t.CompletedAt, &t.DueDate)
+}
+
 func (s *TaskService) List(ctx context.Context, boardID string, f TaskFilter) ([]model.Task, error) {
-	q := `SELECT id, board_id, column_id, title, description, priority, labels, position, created_at, updated_at, completed_at
-		  FROM tasks WHERE board_id = ?`
+	q := `SELECT ` + taskColumns + ` FROM tasks WHERE board_id = ?`
 	args := []any{boardID}
 
 	if f.ColumnID != "" {
@@ -59,8 +65,7 @@ func (s *TaskService) List(ctx context.Context, boardID string, f TaskFilter) ([
 	var tasks []model.Task
 	for rows.Next() {
 		var t model.Task
-		if err := rows.Scan(&t.ID, &t.BoardID, &t.ColumnID, &t.Title, &t.Description,
-			&t.Priority, &t.Labels, &t.Position, &t.CreatedAt, &t.UpdatedAt, &t.CompletedAt); err != nil {
+		if err := scanTask(rows, &t); err != nil {
 			return nil, fmt.Errorf("scan task: %w", err)
 		}
 		tasks = append(tasks, t)
@@ -70,20 +75,26 @@ func (s *TaskService) List(ctx context.Context, boardID string, f TaskFilter) ([
 
 func (s *TaskService) Get(ctx context.Context, id string) (*model.Task, error) {
 	var t model.Task
-	err := s.db.QueryRowContext(ctx,
-		`SELECT id, board_id, column_id, title, description, priority, labels, position, created_at, updated_at, completed_at
-		 FROM tasks WHERE id = ?`, id,
-	).Scan(&t.ID, &t.BoardID, &t.ColumnID, &t.Title, &t.Description,
-		&t.Priority, &t.Labels, &t.Position, &t.CreatedAt, &t.UpdatedAt, &t.CompletedAt)
+	err := scanTask(s.db.QueryRowContext(ctx,
+		`SELECT `+taskColumns+` FROM tasks WHERE id = ?`, id,
+	), &t)
 	if err != nil {
 		return nil, fmt.Errorf("get task %s: %w", id, err)
 	}
 	return &t, nil
 }
 
-func (s *TaskService) Create(ctx context.Context, boardID, title, description string, priority model.Priority, labels string) (*model.Task, error) {
-	if priority == "" {
-		priority = model.PriorityMedium
+type TaskCreate struct {
+	Title       string
+	Description string
+	Priority    model.Priority
+	Labels      string
+	DueDate     *time.Time
+}
+
+func (s *TaskService) Create(ctx context.Context, boardID string, c TaskCreate) (*model.Task, error) {
+	if c.Priority == "" {
+		c.Priority = model.PriorityMedium
 	}
 
 	var columnID string
@@ -104,19 +115,20 @@ func (s *TaskService) Create(ctx context.Context, boardID, title, description st
 		ID:          uuid.NewString(),
 		BoardID:     boardID,
 		ColumnID:    columnID,
-		Title:       title,
-		Description: description,
-		Priority:    priority,
-		Labels:      labels,
+		Title:       c.Title,
+		Description: c.Description,
+		Priority:    c.Priority,
+		Labels:      c.Labels,
 		Position:    maxPos + 1,
 		CreatedAt:   now,
 		UpdatedAt:   now,
+		DueDate:     c.DueDate,
 	}
 
 	_, err = s.db.ExecContext(ctx,
-		`INSERT INTO tasks (id, board_id, column_id, title, description, priority, labels, position, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		t.ID, t.BoardID, t.ColumnID, t.Title, t.Description, t.Priority, t.Labels, t.Position, t.CreatedAt, t.UpdatedAt,
+		`INSERT INTO tasks (id, board_id, column_id, title, description, priority, labels, position, created_at, updated_at, due_date)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		t.ID, t.BoardID, t.ColumnID, t.Title, t.Description, t.Priority, t.Labels, t.Position, t.CreatedAt, t.UpdatedAt, t.DueDate,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("insert task: %w", err)
@@ -125,10 +137,12 @@ func (s *TaskService) Create(ctx context.Context, boardID, title, description st
 }
 
 type TaskUpdate struct {
-	Title       *string
-	Description *string
-	Priority    *model.Priority
-	Labels      *string
+	Title        *string
+	Description  *string
+	Priority     *model.Priority
+	Labels       *string
+	DueDate      *time.Time
+	ClearDueDate bool
 }
 
 func (s *TaskService) Update(ctx context.Context, id string, u TaskUpdate) (*model.Task, error) {
@@ -150,6 +164,12 @@ func (s *TaskService) Update(ctx context.Context, id string, u TaskUpdate) (*mod
 	if u.Labels != nil {
 		setClauses = append(setClauses, "labels = ?")
 		args = append(args, *u.Labels)
+	}
+	if u.ClearDueDate {
+		setClauses = append(setClauses, "due_date = NULL")
+	} else if u.DueDate != nil {
+		setClauses = append(setClauses, "due_date = ?")
+		args = append(args, *u.DueDate)
 	}
 
 	args = append(args, id)

@@ -98,7 +98,12 @@ func registerTools(s *server.MCPServer, boards *service.BoardService, columns *s
 		priority := req.GetString("priority", "")
 		labels := req.GetString("labels", "")
 
-		t, err := tasks.Create(ctx, boardID, title, description, model.Priority(priority), labels)
+		t, err := tasks.Create(ctx, boardID, service.TaskCreate{
+				Title:       title,
+				Description: description,
+				Priority:    model.Priority(priority),
+				Labels:      labels,
+			})
 		if err != nil {
 			return nil, err
 		}

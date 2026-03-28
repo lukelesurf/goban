@@ -29,7 +29,8 @@ CREATE TABLE IF NOT EXISTS tasks (
 	position     INTEGER NOT NULL DEFAULT 0,
 	created_at   DATETIME NOT NULL,
 	updated_at   DATETIME NOT NULL,
-	completed_at DATETIME
+	completed_at DATETIME,
+	due_date     DATETIME
 );
 
 CREATE TABLE IF NOT EXISTS comments (

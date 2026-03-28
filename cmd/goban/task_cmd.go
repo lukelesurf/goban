@@ -76,7 +76,12 @@ func taskCreateCmd(_ *service.BoardService, tasks *service.TaskService) *cobra.C
 		Short: "Create a new task",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			t, err := tasks.Create(context.Background(), boardID, args[0], description, model.Priority(priority), labels)
+			t, err := tasks.Create(context.Background(), boardID, service.TaskCreate{
+				Title:       args[0],
+				Description: description,
+				Priority:    model.Priority(priority),
+				Labels:      labels,
+			})
 			if err != nil {
 				return err
 			}

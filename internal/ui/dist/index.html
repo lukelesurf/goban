@@ -5,82 +5,145 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Goban</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <style>
     [x-cloak] { display: none !important; }
-    .sortable-ghost { opacity: 0.3; }
-    .sortable-drag  { opacity: 0.9; cursor: grabbing; }
+
+    * { scrollbar-width: thin; scrollbar-color: #1e293b transparent; }
+    *::-webkit-scrollbar { width: 4px; height: 4px; }
+    *::-webkit-scrollbar-track { background: transparent; }
+    *::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 9999px; }
+
+    .sortable-ghost { opacity: 0.2; outline: 2px dashed #6366f1; outline-offset: -2px; border-radius: 8px; }
+    .sortable-drag  { opacity: 0.95; cursor: grabbing; }
+
+    .priority-low      { border-left: 3px solid #475569; }
+    .priority-medium   { border-left: 3px solid #3b82f6; }
+    .priority-high     { border-left: 3px solid #f59e0b; }
+    .priority-critical { border-left: 3px solid #ef4444; }
+
+    /* Markdown rendered output */
+    .prose { color: #cbd5e1; line-height: 1.7; font-size: 0.875rem; }
+    .prose h1, .prose h2, .prose h3 { color: #f1f5f9; font-weight: 600; margin: 1rem 0 0.5rem; }
+    .prose h1 { font-size: 1.25rem; }
+    .prose h2 { font-size: 1.1rem; }
+    .prose h3 { font-size: 1rem; }
+    .prose p { margin: 0.5rem 0; }
+    .prose ul { list-style: disc; padding-left: 1.5rem; margin: 0.5rem 0; }
+    .prose ol { list-style: decimal; padding-left: 1.5rem; margin: 0.5rem 0; }
+    .prose li { margin: 0.2rem 0; }
+    .prose code { background: #0f172a; color: #a5b4fc; padding: 0.1rem 0.35rem; border-radius: 0.25rem; font-family: monospace; font-size: 0.8em; }
+    .prose pre { background: #0f172a; padding: 0.875rem; border-radius: 0.5rem; overflow-x: auto; margin: 0.75rem 0; border: 1px solid #1e293b; }
+    .prose pre code { background: none; padding: 0; color: #e2e8f0; }
+    .prose blockquote { border-left: 3px solid #334155; padding-left: 1rem; color: #64748b; margin: 0.75rem 0; font-style: italic; }
+    .prose a { color: #818cf8; text-decoration: underline; }
+    .prose strong { color: #f1f5f9; font-weight: 600; }
+    .prose em { font-style: italic; }
+    .prose hr { border-color: #1e293b; margin: 1rem 0; }
+    .prose table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; font-size: 0.8rem; }
+    .prose th { background: #0f172a; padding: 0.4rem 0.75rem; text-align: left; color: #94a3b8; font-weight: 500; border: 1px solid #1e293b; }
+    .prose td { padding: 0.4rem 0.75rem; border: 1px solid #1e293b; }
   </style>
 </head>
-<body class="bg-gray-950 text-gray-100 min-h-screen" x-data="app()" x-init="init()" x-cloak>
+<body class="bg-slate-950 text-slate-100 min-h-screen" x-data="app()" x-init="init()" x-cloak>
 
-  <!-- Board List -->
+  <!-- ───────────────── Board List ───────────────── -->
   <div x-show="view === 'boards'">
-    <header class="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
-      <h1 class="text-xl font-semibold tracking-tight">Goban</h1>
+    <header class="sticky top-0 z-10 border-b border-slate-800/60 px-6 py-3.5 flex items-center justify-between bg-slate-950/80 backdrop-blur">
+      <div class="flex items-center gap-2.5">
+        <div class="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center text-white text-xs font-bold select-none">G</div>
+        <span class="font-semibold tracking-tight">Goban</span>
+      </div>
       <button @click="openCreateBoard()"
-        class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-sm font-medium transition-colors">
+        class="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
         New Board
       </button>
     </header>
 
-    <main class="p-6">
-      <div x-show="boards.length === 0" class="text-gray-500 text-sm">No boards yet.</div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <main class="p-6 max-w-5xl mx-auto">
+      <div class="mb-6">
+        <h2 class="text-lg font-semibold">Boards</h2>
+        <p class="text-sm text-slate-500 mt-0.5">Select a board to get started</p>
+      </div>
+
+      <div x-show="boards.length === 0" class="text-center py-24">
+        <div class="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center mx-auto mb-4">
+          <svg class="w-6 h-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        </div>
+        <p class="text-slate-400 text-sm font-medium">No boards yet</p>
+        <p class="text-slate-600 text-xs mt-1">Create your first board to get started</p>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <template x-for="board in boards" :key="board.id">
           <div @click="openBoard(board)"
-            class="bg-gray-900 border border-gray-800 rounded-lg p-4 cursor-pointer hover:border-gray-600 transition-colors">
-            <h2 class="font-medium mb-1" x-text="board.name"></h2>
-            <p class="text-sm text-gray-400 line-clamp-2" x-text="board.description || 'No description'"></p>
+            class="group bg-slate-900 border border-slate-800 rounded-xl p-5 cursor-pointer hover:border-indigo-500/40 hover:bg-slate-800/50 transition-all">
+            <div class="w-8 h-1 rounded-full bg-indigo-600 mb-4 group-hover:bg-indigo-400 transition-colors"></div>
+            <h3 class="font-semibold mb-1.5 group-hover:text-indigo-300 transition-colors" x-text="board.name"></h3>
+            <p class="text-sm text-slate-400 line-clamp-2 leading-relaxed" x-text="board.description || 'No description'"></p>
+            <div class="mt-4 text-xs text-slate-600" x-text="formatDate(board.created_at)"></div>
           </div>
         </template>
       </div>
     </main>
   </div>
 
-  <!-- Board View -->
+  <!-- ───────────────── Board View ───────────────── -->
   <div x-show="view === 'board'" class="flex flex-col h-screen">
-    <header class="border-b border-gray-800 px-6 py-4 flex items-center gap-4 shrink-0">
-      <button @click="view = 'boards'" class="text-gray-400 hover:text-gray-100 text-sm transition-colors">
-        ← Boards
+    <header class="sticky top-0 z-10 border-b border-slate-800/60 px-6 py-3.5 flex items-center gap-2 shrink-0 bg-slate-950/80 backdrop-blur">
+      <button @click="view = 'boards'"
+        class="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-300 transition-colors rounded px-2 py-1 hover:bg-slate-800/60">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        Boards
       </button>
-      <h1 class="text-xl font-semibold tracking-tight" x-text="currentBoard?.name"></h1>
+      <svg class="w-3.5 h-3.5 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+      <h1 class="font-semibold text-sm" x-text="currentBoard?.name"></h1>
       <div class="ml-auto">
         <button @click="openCreateTask()"
-          class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-sm font-medium transition-colors">
+          class="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
           New Task
         </button>
       </div>
     </header>
 
-    <div class="flex gap-4 p-4 overflow-x-auto flex-1 items-start">
+    <div class="flex gap-4 p-5 overflow-x-auto flex-1 items-start">
       <template x-for="col in columns" :key="col.id">
-        <div class="bg-gray-900 rounded-lg p-3 w-72 shrink-0">
-          <div class="flex items-center justify-between mb-3">
-            <span class="text-sm font-medium text-gray-300" x-text="col.name"></span>
-            <span class="text-xs text-gray-500"
+        <div class="bg-slate-900/50 border border-slate-800/80 rounded-xl p-3 w-72 shrink-0 flex flex-col">
+          <div class="flex items-center justify-between mb-3 px-1">
+            <span class="text-sm font-medium text-slate-200" x-text="col.name"></span>
+            <span class="text-xs bg-slate-800 text-slate-400 rounded-full px-2 py-0.5 font-medium tabular-nums"
               x-text="tasksForColumn(col.id).length + (col.wip_limit > 0 ? ' / ' + col.wip_limit : '')">
             </span>
           </div>
+
           <div class="flex flex-col gap-2 min-h-8"
             :id="'col-' + col.id"
             x-init="initSortable($el, col.id)">
             <template x-for="task in tasksForColumn(col.id)" :key="task.id">
               <div @click="openTask(task)"
                 :data-id="task.id"
-                class="bg-gray-800 border border-gray-700 rounded p-3 cursor-grab hover:border-gray-500 transition-colors">
-                <div class="flex items-start justify-between gap-2 mb-1">
-                  <span class="text-sm font-medium leading-snug" x-text="task.title"></span>
-                  <span class="shrink-0 text-xs px-1.5 py-0.5 rounded font-medium"
-                    :class="priorityClass(task.priority)"
+                :class="'priority-' + task.priority"
+                class="bg-slate-800/80 rounded-lg p-3 cursor-grab hover:bg-slate-800 active:cursor-grabbing transition-all border border-slate-700/40 hover:border-slate-600/60 hover:shadow-lg hover:shadow-black/30 select-none">
+                <p class="text-sm font-medium leading-snug mb-1.5" x-text="task.title"></p>
+                <p x-show="task.description" class="text-xs text-slate-400 line-clamp-2 leading-relaxed mb-2" x-text="task.description"></p>
+                <div class="flex items-center gap-1.5 flex-wrap mt-1">
+                  <span class="text-xs px-1.5 py-0.5 rounded-full font-medium"
+                    :class="priorityPillClass(task.priority)"
                     x-text="task.priority">
                   </span>
-                </div>
-                <div x-show="task.labels" class="flex flex-wrap gap-1 mt-2">
-                  <template x-for="label in task.labels.split(',')" :key="label">
-                    <span class="text-xs bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded"
-                      x-text="label.trim()">
+                  <template x-if="task.labels">
+                    <template x-for="label in task.labels.split(',')" :key="label">
+                      <span class="text-xs bg-slate-700/60 text-slate-400 px-1.5 py-0.5 rounded-full" x-text="label.trim()"></span>
+                    </template>
+                  </template>
+                  <template x-if="task.due_date">
+                    <span class="text-xs px-1.5 py-0.5 rounded-full font-medium ml-auto"
+                      :class="isDueOverdue(task.due_date) ? 'bg-red-950 text-red-400' : 'bg-slate-700 text-slate-400'">
+                      <span x-text="formatDueDate(task.due_date)"></span>
                     </span>
                   </template>
                 </div>
@@ -92,143 +155,303 @@
     </div>
   </div>
 
-  <!-- Create Board Modal -->
+  <!-- ───────────────── Create Board Modal ───────────────── -->
   <div x-show="modal === 'createBoard'"
-    class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
-    @keydown.escape.window="modal = null">
-    <div class="bg-gray-900 border border-gray-700 rounded-lg p-6 w-full max-w-md" @click.stop>
-      <h2 class="text-lg font-semibold mb-4">New Board</h2>
+    x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+    x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+    class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+    @click="modal = null" @keydown.escape.window="modal = null">
+    <div
+      x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+      x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+      class="bg-slate-900 border border-slate-700/80 rounded-2xl p-6 w-full max-w-md shadow-2xl shadow-black/60"
+      @click.stop>
+      <h2 class="text-base font-semibold mb-5">New Board</h2>
       <form @submit.prevent="createBoard()">
         <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1">Name</label>
+          <label class="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">Name</label>
           <input x-model="form.name" type="text" required autofocus
-            class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
+            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 transition-colors placeholder-slate-600"
+            placeholder="My Project" />
         </div>
         <div class="mb-6">
-          <label class="block text-sm text-gray-400 mb-1">Description</label>
-          <textarea x-model="form.description" rows="2"
-            class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500"></textarea>
+          <label class="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">Description</label>
+          <textarea x-model="form.description" rows="3"
+            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 transition-colors resize-none placeholder-slate-600"
+            placeholder="What is this board for?"></textarea>
         </div>
         <div class="flex justify-end gap-2">
           <button type="button" @click="modal = null"
-            class="px-3 py-1.5 text-sm text-gray-400 hover:text-gray-100 transition-colors">Cancel</button>
+            class="px-3.5 py-2 text-sm text-slate-400 hover:text-slate-100 hover:bg-slate-800 rounded-lg transition-colors">Cancel</button>
           <button type="submit"
-            class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-sm font-medium transition-colors">
-            Create
-          </button>
+            class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors">Create Board</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- Create Task Modal -->
+  <!-- ───────────────── Create Task Modal ───────────────── -->
   <div x-show="modal === 'createTask'"
-    class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
-    @keydown.escape.window="modal = null">
-    <div class="bg-gray-900 border border-gray-700 rounded-lg p-6 w-full max-w-md" @click.stop>
-      <h2 class="text-lg font-semibold mb-4">New Task</h2>
+    x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+    x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+    class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+    @click="modal = null" @keydown.escape.window="modal = null">
+    <div
+      x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+      x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+      class="bg-slate-900 border border-slate-700/80 rounded-2xl p-6 w-full max-w-md shadow-2xl shadow-black/60"
+      @click.stop>
+      <h2 class="text-base font-semibold mb-5">New Task</h2>
       <form @submit.prevent="createTask()">
         <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1">Title</label>
+          <label class="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">Title</label>
           <input x-model="form.title" type="text" required autofocus
-            class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
+            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 transition-colors placeholder-slate-600"
+            placeholder="What needs to be done?" />
         </div>
         <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1">Description</label>
+          <label class="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">Description</label>
           <textarea x-model="form.description" rows="3"
-            class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500"></textarea>
+            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 transition-colors resize-none placeholder-slate-600 font-mono"
+            placeholder="Supports markdown..."></textarea>
         </div>
-        <div class="mb-4 flex gap-3">
-          <div class="flex-1">
-            <label class="block text-sm text-gray-400 mb-1">Priority</label>
+        <div class="mb-4 grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">Priority</label>
             <select x-model="form.priority"
-              class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+              class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 transition-colors">
               <option value="low">Low</option>
               <option value="medium" selected>Medium</option>
               <option value="high">High</option>
               <option value="critical">Critical</option>
             </select>
           </div>
-          <div class="flex-1">
-            <label class="block text-sm text-gray-400 mb-1">Labels</label>
-            <input x-model="form.labels" type="text" placeholder="comma, separated"
-              class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">Due Date</label>
+            <input x-model="form.dueDate" type="date"
+              class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 transition-colors" />
           </div>
+        </div>
+        <div class="mb-6">
+          <label class="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">Labels</label>
+          <input x-model="form.labels" type="text" placeholder="bug, frontend, ui"
+            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 transition-colors placeholder-slate-600" />
         </div>
         <div class="flex justify-end gap-2">
           <button type="button" @click="modal = null"
-            class="px-3 py-1.5 text-sm text-gray-400 hover:text-gray-100 transition-colors">Cancel</button>
+            class="px-3.5 py-2 text-sm text-slate-400 hover:text-slate-100 hover:bg-slate-800 rounded-lg transition-colors">Cancel</button>
           <button type="submit"
-            class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-sm font-medium transition-colors">
-            Create
-          </button>
+            class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors">Create Task</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- Task Detail Modal -->
+  <!-- ───────────────── Task Detail Modal ───────────────── -->
   <div x-show="modal === 'task'"
-    class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
-    @keydown.escape.window="modal = null">
-    <div class="bg-gray-900 border border-gray-700 rounded-lg w-full max-w-2xl max-h-[90vh] flex flex-col" @click.stop>
-      <div class="flex items-start justify-between p-6 border-b border-gray-800">
-        <div class="flex-1 mr-4">
-          <h2 class="text-lg font-semibold" x-text="selectedTask?.title"></h2>
-          <div class="flex items-center gap-2 mt-1">
-            <span class="text-xs px-1.5 py-0.5 rounded font-medium"
-              :class="priorityClass(selectedTask?.priority)"
-              x-text="selectedTask?.priority">
-            </span>
-            <template x-if="selectedTask?.labels">
-              <template x-for="label in (selectedTask?.labels || '').split(',')" :key="label">
-                <span class="text-xs bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded" x-text="label.trim()"></span>
-              </template>
-            </template>
-          </div>
+    x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+    x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+    class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+    @click="modal = null" @keydown.escape.window="modal = null">
+    <div
+      x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+      x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+      class="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl shadow-black/60"
+      @click.stop>
+
+      <!-- Modal header -->
+      <div class="flex items-center justify-between px-6 py-4 border-b border-slate-800/80 shrink-0 gap-4">
+        <h2 x-show="!editMode" class="text-base font-semibold leading-snug flex-1 min-w-0 truncate" x-text="selectedTask?.title"></h2>
+        <input x-show="editMode" x-model="form.editTitle" type="text"
+          class="flex-1 min-w-0 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm font-semibold focus:outline-none focus:border-indigo-500 transition-colors" />
+
+        <div class="flex items-center gap-2 shrink-0">
+          <!-- View mode buttons -->
+          <template x-if="!editMode">
+            <div class="flex items-center gap-2">
+              <button @click="enterEditMode()"
+                class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-400 hover:text-slate-100 hover:bg-slate-800 rounded-lg transition-colors">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                Edit
+              </button>
+              <button @click="modal = null" class="text-slate-500 hover:text-slate-300 hover:bg-slate-800 rounded-lg p-1.5 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+          </template>
+          <!-- Edit mode buttons -->
+          <template x-if="editMode">
+            <div class="flex items-center gap-2">
+              <button @click="editMode = false"
+                class="px-2.5 py-1.5 text-xs text-slate-400 hover:text-slate-100 hover:bg-slate-800 rounded-lg transition-colors">Cancel</button>
+              <button @click="saveTask()"
+                class="px-2.5 py-1.5 text-xs bg-indigo-600 hover:bg-indigo-500 rounded-lg font-medium transition-colors">Save</button>
+              <button @click="modal = null" class="text-slate-500 hover:text-slate-300 hover:bg-slate-800 rounded-lg p-1.5 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+          </template>
         </div>
-        <button @click="modal = null" class="text-gray-500 hover:text-gray-300 text-xl leading-none">&times;</button>
       </div>
 
-      <div class="flex-1 overflow-y-auto p-6">
-        <div x-show="selectedTask?.description" class="mb-6">
-          <h3 class="text-xs uppercase tracking-wider text-gray-500 mb-2">Description</h3>
-          <p class="text-sm text-gray-300 whitespace-pre-wrap" x-text="selectedTask?.description"></p>
-        </div>
+      <!-- Modal body -->
+      <div class="flex flex-1 overflow-hidden">
 
-        <div>
-          <h3 class="text-xs uppercase tracking-wider text-gray-500 mb-3">Comments</h3>
-          <div class="flex flex-col gap-3 mb-4">
-            <template x-for="comment in selectedTaskComments" :key="comment.id">
-              <div class="bg-gray-800 rounded p-3">
-                <div class="flex items-center gap-2 mb-1">
-                  <span class="text-xs font-medium text-blue-400" x-text="comment.author"></span>
-                  <span class="text-xs text-gray-500" x-text="formatDate(comment.created_at)"></span>
-                </div>
-                <p class="text-sm text-gray-300 whitespace-pre-wrap" x-text="comment.body"></p>
+        <!-- Left: description + comments (view) / edit form (edit) -->
+        <div class="flex-1 overflow-y-auto p-6 border-r border-slate-800/80">
+
+          <!-- ── View mode ── -->
+          <div x-show="!editMode">
+            <div class="mb-6">
+              <h3 class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">Description</h3>
+              <div x-show="selectedTask?.description"
+                class="prose"
+                x-html="renderMarkdown(selectedTask?.description || '')">
               </div>
-            </template>
-            <div x-show="selectedTaskComments.length === 0" class="text-sm text-gray-500">No comments yet.</div>
+              <p x-show="!selectedTask?.description" class="text-xs text-slate-600 italic">No description.</p>
+            </div>
+
+            <h3 class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">Comments</h3>
+            <div class="flex flex-col gap-3 mb-4">
+              <template x-for="comment in selectedTaskComments" :key="comment.id">
+                <div class="bg-slate-800/60 rounded-xl p-3 border border-slate-700/40">
+                  <div class="flex items-center gap-2 mb-1.5">
+                    <div class="w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold shrink-0"
+                      x-text="(comment.author || '?')[0].toUpperCase()"></div>
+                    <span class="text-xs font-medium text-slate-300" x-text="comment.author"></span>
+                    <span class="text-xs text-slate-600" x-text="formatDate(comment.created_at)"></span>
+                  </div>
+                  <div class="prose pl-7" x-html="renderMarkdown(comment.body)"></div>
+                </div>
+              </template>
+              <p x-show="selectedTaskComments.length === 0" class="text-xs text-slate-600 italic">No comments yet.</p>
+            </div>
+
+            <form @submit.prevent="addComment()">
+              <textarea x-model="form.commentBody" rows="2" placeholder="Leave a comment... (supports markdown)"
+                class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 transition-colors resize-none mb-2 placeholder-slate-600 font-mono"></textarea>
+              <button type="submit"
+                class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors">Comment</button>
+            </form>
           </div>
 
-          <form @submit.prevent="addComment()">
-            <textarea x-model="form.commentBody" rows="2" placeholder="Add a comment..."
-              class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500 mb-2"></textarea>
-            <button type="submit"
-              class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-sm font-medium transition-colors">
-              Comment
-            </button>
-          </form>
+          <!-- ── Edit mode ── -->
+          <div x-show="editMode">
+            <div class="mb-4">
+              <div class="flex items-center justify-between mb-1.5">
+                <label class="text-xs font-medium text-slate-400 uppercase tracking-wider">Description</label>
+                <div class="flex gap-1 text-xs">
+                  <button @click="previewMd = false" :class="!previewMd ? 'text-indigo-400 bg-slate-800' : 'text-slate-500 hover:text-slate-300'"
+                    class="px-2 py-0.5 rounded transition-colors">Edit</button>
+                  <button @click="previewMd = true" :class="previewMd ? 'text-indigo-400 bg-slate-800' : 'text-slate-500 hover:text-slate-300'"
+                    class="px-2 py-0.5 rounded transition-colors">Preview</button>
+                </div>
+              </div>
+              <textarea x-show="!previewMd" x-model="form.editDescription" rows="8"
+                class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 transition-colors resize-none font-mono placeholder-slate-600"
+                placeholder="Describe the task... (markdown supported)"></textarea>
+              <div x-show="previewMd"
+                class="prose min-h-[8rem] bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-3"
+                x-html="renderMarkdown(form.editDescription || '')">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 mb-4">
+              <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">Priority</label>
+                <select x-model="form.editPriority"
+                  class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 transition-colors">
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="critical">Critical</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">Due Date</label>
+                <input x-model="form.editDueDate" type="date"
+                  class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 transition-colors" />
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <label class="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">Labels</label>
+              <input x-model="form.editLabels" type="text" placeholder="bug, frontend, ui"
+                class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 transition-colors placeholder-slate-600" />
+            </div>
+
+            <!-- Delete -->
+            <div class="pt-4 mt-4 border-t border-slate-800">
+              <button @click="deleteTask()"
+                class="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-400 hover:bg-red-950/40 px-2.5 py-1.5 rounded-lg transition-colors">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                Delete task
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Right: metadata sidebar -->
+        <div class="w-48 shrink-0 overflow-y-auto p-5 flex flex-col gap-5">
+          <div>
+            <p class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Priority</p>
+            <span class="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg font-medium"
+              :class="priorityPillClass(selectedTask?.priority)">
+              <span class="w-1.5 h-1.5 rounded-full" :class="priorityDotClass(selectedTask?.priority)"></span>
+              <span x-text="selectedTask?.priority"></span>
+            </span>
+          </div>
+
+          <template x-if="selectedTask?.labels">
+            <div>
+              <p class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Labels</p>
+              <div class="flex flex-wrap gap-1">
+                <template x-for="label in (selectedTask?.labels || '').split(',')" :key="label">
+                  <span class="text-xs bg-slate-800 text-slate-400 border border-slate-700/60 px-1.5 py-0.5 rounded-full" x-text="label.trim()"></span>
+                </template>
+              </div>
+            </div>
+          </template>
+
+          <div>
+            <p class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Column</p>
+            <p class="text-xs text-slate-300" x-text="columnName(selectedTask?.column_id)"></p>
+          </div>
+
+          <template x-if="selectedTask?.due_date">
+            <div>
+              <p class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Due Date</p>
+              <p class="text-xs font-medium" :class="isDueOverdue(selectedTask?.due_date) ? 'text-red-400' : 'text-slate-300'"
+                x-text="formatDueDate(selectedTask?.due_date)"></p>
+            </div>
+          </template>
+
+          <div>
+            <p class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Created</p>
+            <p class="text-xs text-slate-300" x-text="formatDate(selectedTask?.created_at)"></p>
+          </div>
+
+          <template x-if="selectedTask?.completed_at">
+            <div>
+              <p class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Completed</p>
+              <p class="text-xs text-emerald-400" x-text="formatDate(selectedTask?.completed_at)"></p>
+            </div>
+          </template>
         </div>
       </div>
     </div>
   </div>
 
 <script>
+marked.setOptions({ breaks: true, gfm: true })
+
 function app() {
   return {
     view: 'boards',
     modal: null,
+    editMode: false,
+    previewMd: false,
     boards: [],
     currentBoard: null,
     columns: [],
@@ -249,18 +472,14 @@ function app() {
         animation: 150,
         ghostClass: 'sortable-ghost',
         dragClass: 'sortable-drag',
-        // Don't fire click after a drag
         onChoose() { el._dragging = false },
         onStart()  { el._dragging = true },
         async onEnd(evt) {
           const taskId   = evt.item.dataset.id
           const toColId  = evt.to.id.replace('col-', '')
           const position = evt.newIndex
-
-          // Optimistically update local state so UI doesn't snap back
           const task = self.tasks.find(t => t.id === taskId)
           if (task) task.column_id = toColId
-
           await fetch(`/api/v1/tasks/${taskId}/move`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -292,6 +511,10 @@ function app() {
       return this.tasks.filter(t => t.column_id === columnId)
     },
 
+    columnName(columnId) {
+      return this.columns.find(c => c.id === columnId)?.name || ''
+    },
+
     openCreateBoard() {
       this.form = { name: '', description: '' }
       this.modal = 'createBoard'
@@ -308,36 +531,71 @@ function app() {
     },
 
     openCreateTask() {
-      this.form = { title: '', description: '', priority: 'medium', labels: '' }
+      this.form = { title: '', description: '', priority: 'medium', labels: '', dueDate: '' }
       this.modal = 'createTask'
     },
 
     async createTask() {
+      const body = {
+        title: this.form.title,
+        description: this.form.description,
+        priority: this.form.priority,
+        labels: this.form.labels,
+      }
+      if (this.form.dueDate) body.due_date = this.form.dueDate
       await fetch(`/api/v1/boards/${this.currentBoard.id}/tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: this.form.title,
-          description: this.form.description,
-          priority: this.form.priority,
-          labels: this.form.labels,
-        }),
+        body: JSON.stringify(body),
       })
       this.modal = null
       await this.openBoard(this.currentBoard)
     },
 
     async openTask(task) {
-      // Don't open modal if this click was the end of a drag
       if (task._dragging) return
       this.selectedTask = task
       this.selectedTaskComments = []
+      this.editMode = false
+      this.previewMd = false
       this.form = { commentBody: '' }
       const res = await fetch(`/api/v1/tasks/${task.id}`)
       const data = await res.json()
       this.selectedTask = data.task
       this.selectedTaskComments = data.comments || []
       this.modal = 'task'
+    },
+
+    enterEditMode() {
+      const t = this.selectedTask
+      this.form.editTitle       = t.title
+      this.form.editDescription = t.description || ''
+      this.form.editPriority    = t.priority
+      this.form.editLabels      = t.labels || ''
+      this.form.editDueDate     = t.due_date ? t.due_date.substring(0, 10) : ''
+      this.previewMd = false
+      this.editMode = true
+    },
+
+    async saveTask() {
+      const body = {
+        title:       this.form.editTitle,
+        description: this.form.editDescription,
+        priority:    this.form.editPriority,
+        labels:      this.form.editLabels,
+        due_date:    this.form.editDueDate, // "" clears, "YYYY-MM-DD" sets
+      }
+      const res = await fetch(`/api/v1/tasks/${this.selectedTask.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const updated = await res.json()
+      this.selectedTask = updated
+      // Sync task in the board task list
+      const idx = this.tasks.findIndex(t => t.id === updated.id)
+      if (idx !== -1) this.tasks[idx] = updated
+      this.editMode = false
     },
 
     async addComment() {
@@ -353,16 +611,48 @@ function app() {
       this.selectedTaskComments = data.comments || []
     },
 
-    priorityClass(priority) {
+    async deleteTask() {
+      if (!confirm(`Delete "${this.selectedTask.title}"? This cannot be undone.`)) return
+      await fetch(`/api/v1/tasks/${this.selectedTask.id}`, { method: 'DELETE' })
+      this.tasks = this.tasks.filter(t => t.id !== this.selectedTask.id)
+      this.modal = null
+    },
+
+    renderMarkdown(text) {
+      if (!text) return ''
+      return marked.parse(text)
+    },
+
+    priorityPillClass(priority) {
       return {
-        low:      'bg-gray-700 text-gray-300',
-        medium:   'bg-blue-900 text-blue-300',
-        high:     'bg-amber-900 text-amber-300',
-        critical: 'bg-red-900 text-red-300',
-      }[priority] || 'bg-gray-700 text-gray-300'
+        low:      'bg-slate-800 text-slate-400',
+        medium:   'bg-blue-950 text-blue-400',
+        high:     'bg-amber-950 text-amber-400',
+        critical: 'bg-red-950 text-red-400',
+      }[priority] || 'bg-slate-800 text-slate-400'
+    },
+
+    priorityDotClass(priority) {
+      return {
+        low:      'bg-slate-500',
+        medium:   'bg-blue-500',
+        high:     'bg-amber-500',
+        critical: 'bg-red-500',
+      }[priority] || 'bg-slate-500'
+    },
+
+    isDueOverdue(iso) {
+      if (!iso) return false
+      return new Date(iso) < new Date()
+    },
+
+    formatDueDate(iso) {
+      if (!iso) return ''
+      return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
     },
 
     formatDate(iso) {
+      if (!iso) return ''
       return new Date(iso).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })
     },
   }

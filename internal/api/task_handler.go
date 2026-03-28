@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/lukelesurf/goban/internal/model"
@@ -66,6 +67,7 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Description string         `json:"description"`
 		Priority    model.Priority `json:"priority"`
 		Labels      string         `json:"labels"`
+		DueDate     *string        `json:"due_date"` // YYYY-MM-DD or omit
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -76,7 +78,22 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	task, err := h.tasks.Create(r.Context(), boardID, body.Title, body.Description, body.Priority, body.Labels)
+	c := service.TaskCreate{
+		Title:       body.Title,
+		Description: body.Description,
+		Priority:    body.Priority,
+		Labels:      body.Labels,
+	}
+	if body.DueDate != nil && *body.DueDate != "" {
+		t, err := time.Parse("2006-01-02", *body.DueDate)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid due_date, use YYYY-MM-DD")
+			return
+		}
+		c.DueDate = &t
+	}
+
+	task, err := h.tasks.Create(r.Context(), boardID, c)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -91,18 +108,33 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Description *string         `json:"description"`
 		Priority    *model.Priority `json:"priority"`
 		Labels      *string         `json:"labels"`
+		DueDate     *string         `json:"due_date"` // YYYY-MM-DD to set, "" to clear
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	task, err := h.tasks.Update(r.Context(), id, service.TaskUpdate{
+	u := service.TaskUpdate{
 		Title:       body.Title,
 		Description: body.Description,
 		Priority:    body.Priority,
 		Labels:      body.Labels,
-	})
+	}
+	if body.DueDate != nil {
+		if *body.DueDate == "" {
+			u.ClearDueDate = true
+		} else {
+			t, err := time.Parse("2006-01-02", *body.DueDate)
+			if err != nil {
+				writeError(w, http.StatusBadRequest, "invalid due_date, use YYYY-MM-DD")
+				return
+			}
+			u.DueDate = &t
+		}
+	}
+
+	task, err := h.tasks.Update(r.Context(), id, u)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "task not found")

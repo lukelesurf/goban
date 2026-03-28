@@ -27,5 +27,9 @@ func Open(path string) (*DB, error) {
 		return nil, fmt.Errorf("migrate db: %w", err)
 	}
 
+	// Column additions for existing databases — errors are intentionally ignored
+	// (ALTER TABLE fails with "duplicate column name" if already applied)
+	conn.Exec(`ALTER TABLE tasks ADD COLUMN due_date DATETIME`)
+
 	return &DB{conn}, nil
 }

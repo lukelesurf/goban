@@ -20,6 +20,8 @@ type Task struct {
 	Priority    Priority   `json:"priority"`
 	Labels      string     `json:"labels"`
 	Position    int        `json:"position"`
+	KeyNumber   int        `json:"key_number"`
+	Key         string     `json:"key"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
 	CompletedAt *time.Time `json:"completed_at,omitempty"`

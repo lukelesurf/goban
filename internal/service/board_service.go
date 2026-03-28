@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,6 +14,21 @@ import (
 
 var defaultColumns = []string{"To Do", "In Progress", "Review", "Done"}
 
+var nonLetters = regexp.MustCompile(`[^a-zA-Z]`)
+
+// boardKeyBase derives a short uppercase identifier from a board name (e.g. "My Board" → "MYBOA").
+func boardKeyBase(name string) string {
+	letters := nonLetters.ReplaceAllString(name, "")
+	base := strings.ToUpper(letters)
+	if len(base) > 5 {
+		base = base[:5]
+	}
+	if base == "" {
+		base = "BOARD"
+	}
+	return base
+}
+
 type BoardService struct {
 	db *db.DB
 }
@@ -20,10 +37,10 @@ func NewBoardService(db *db.DB) *BoardService {
 	return &BoardService{db: db}
 }
 
-const boardColumns = `id, name, description, is_default, created_at, updated_at`
+const boardColumns = `id, name, description, key, is_default, created_at, updated_at`
 
 func scanBoard(row interface{ Scan(...any) error }, b *model.Board) error {
-	return row.Scan(&b.ID, &b.Name, &b.Description, &b.IsDefault, &b.CreatedAt, &b.UpdatedAt)
+	return row.Scan(&b.ID, &b.Name, &b.Description, &b.Key, &b.IsDefault, &b.CreatedAt, &b.UpdatedAt)
 }
 
 func (s *BoardService) List(ctx context.Context) ([]model.Board, error) {
@@ -79,13 +96,6 @@ func (s *BoardService) ClearDefault(ctx context.Context, id string) error {
 
 func (s *BoardService) Create(ctx context.Context, name, description string) (*model.Board, error) {
 	now := time.Now().UTC()
-	b := model.Board{
-		ID:          uuid.NewString(),
-		Name:        name,
-		Description: description,
-		CreatedAt:   now,
-		UpdatedAt:   now,
-	}
 
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -93,9 +103,30 @@ func (s *BoardService) Create(ctx context.Context, name, description string) (*m
 	}
 	defer tx.Rollback()
 
+	// Generate a unique board key within the transaction.
+	base := boardKeyBase(name)
+	key := base
+	for i := 2; ; i++ {
+		var count int
+		tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM boards WHERE key = ?`, key).Scan(&count)
+		if count == 0 {
+			break
+		}
+		key = fmt.Sprintf("%s%d", base, i)
+	}
+
+	b := model.Board{
+		ID:          uuid.NewString(),
+		Name:        name,
+		Description: description,
+		Key:         key,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
 	_, err = tx.ExecContext(ctx,
-		`INSERT INTO boards (id, name, description, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
-		b.ID, b.Name, b.Description, b.IsDefault, b.CreatedAt, b.UpdatedAt,
+		`INSERT INTO boards (id, name, description, key, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		b.ID, b.Name, b.Description, b.Key, b.IsDefault, b.CreatedAt, b.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("insert board: %w", err)

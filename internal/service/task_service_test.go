@@ -115,6 +115,45 @@ func TestTaskMove_DoesNotSetCompletedAtForMiddleColumn(t *testing.T) {
 	}
 }
 
+func TestTaskCreate_KeyAssigned(t *testing.T) {
+	ctx := context.Background()
+	boards, _, tasks, boardID := seedBoard(t, ctx, newTestDB(t), "Goban")
+
+	board, _ := boards.List(ctx)
+	boardKey := board[0].Key // "GOBAN"
+
+	t1, err := tasks.Create(ctx, boardID, service.TaskCreate{Title: "first"})
+	if err != nil {
+		t.Fatalf("create task 1: %v", err)
+	}
+	t2, err := tasks.Create(ctx, boardID, service.TaskCreate{Title: "second"})
+	if err != nil {
+		t.Fatalf("create task 2: %v", err)
+	}
+	t3, err := tasks.Create(ctx, boardID, service.TaskCreate{Title: "third"})
+	if err != nil {
+		t.Fatalf("create task 3: %v", err)
+	}
+
+	wantKeys := []string{
+		boardKey + "-1",
+		boardKey + "-2",
+		boardKey + "-3",
+	}
+	gotKeys := []string{t1.Key, t2.Key, t3.Key}
+
+	for i, want := range wantKeys {
+		if gotKeys[i] != want {
+			t.Errorf("task[%d]: want key %q, got %q", i, want, gotKeys[i])
+		}
+	}
+
+	// key_number should also increment
+	if t1.KeyNumber != 1 || t2.KeyNumber != 2 || t3.KeyNumber != 3 {
+		t.Errorf("want key_numbers 1,2,3 — got %d,%d,%d", t1.KeyNumber, t2.KeyNumber, t3.KeyNumber)
+	}
+}
+
 func TestTaskUpdate_Partial(t *testing.T) {
 	ctx := context.Background()
 	_, _, tasks, boardID := seedBoard(t, ctx, newTestDB(t), "Board")

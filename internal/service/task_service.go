@@ -26,11 +26,12 @@ type TaskFilter struct {
 	Search   string
 }
 
-const taskColumns = `id, board_id, column_id, title, description, priority, labels, position, created_at, updated_at, completed_at, due_date`
+const taskColumns = `id, board_id, column_id, title, description, priority, labels, position, key_number, task_key, created_at, updated_at, completed_at, due_date`
 
 func scanTask(row interface{ Scan(...any) error }, t *model.Task) error {
 	return row.Scan(&t.ID, &t.BoardID, &t.ColumnID, &t.Title, &t.Description,
-		&t.Priority, &t.Labels, &t.Position, &t.CreatedAt, &t.UpdatedAt, &t.CompletedAt, &t.DueDate)
+		&t.Priority, &t.Labels, &t.Position, &t.KeyNumber, &t.Key,
+		&t.CreatedAt, &t.UpdatedAt, &t.CompletedAt, &t.DueDate)
 }
 
 func (s *TaskService) List(ctx context.Context, boardID string, f TaskFilter) ([]model.Task, error) {
@@ -97,18 +98,32 @@ func (s *TaskService) Create(ctx context.Context, boardID string, c TaskCreate) 
 		c.Priority = model.PriorityMedium
 	}
 
-	var columnID string
-	err := s.db.QueryRowContext(ctx,
-		`SELECT id FROM columns WHERE board_id = ? ORDER BY position ASC LIMIT 1`, boardID,
-	).Scan(&columnID)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	var columnID string
+	if err := tx.QueryRowContext(ctx,
+		`SELECT id FROM columns WHERE board_id = ? ORDER BY position ASC LIMIT 1`, boardID,
+	).Scan(&columnID); err != nil {
 		return nil, fmt.Errorf("find first column: %w", err)
 	}
 
 	var maxPos int
-	s.db.QueryRowContext(ctx,
+	tx.QueryRowContext(ctx,
 		`SELECT COALESCE(MAX(position), -1) FROM tasks WHERE column_id = ?`, columnID,
 	).Scan(&maxPos)
+
+	// Assign the next sequential key number for this board.
+	var nextKeyNum int
+	tx.QueryRowContext(ctx,
+		`SELECT COALESCE(MAX(key_number), 0) + 1 FROM tasks WHERE board_id = ?`, boardID,
+	).Scan(&nextKeyNum)
+
+	var boardKey string
+	tx.QueryRowContext(ctx, `SELECT key FROM boards WHERE id = ?`, boardID).Scan(&boardKey)
 
 	now := time.Now().UTC()
 	t := model.Task{
@@ -120,18 +135,25 @@ func (s *TaskService) Create(ctx context.Context, boardID string, c TaskCreate) 
 		Priority:    c.Priority,
 		Labels:      c.Labels,
 		Position:    maxPos + 1,
+		KeyNumber:   nextKeyNum,
+		Key:         fmt.Sprintf("%s-%d", boardKey, nextKeyNum),
 		CreatedAt:   now,
 		UpdatedAt:   now,
 		DueDate:     c.DueDate,
 	}
 
-	_, err = s.db.ExecContext(ctx,
-		`INSERT INTO tasks (id, board_id, column_id, title, description, priority, labels, position, created_at, updated_at, due_date)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		t.ID, t.BoardID, t.ColumnID, t.Title, t.Description, t.Priority, t.Labels, t.Position, t.CreatedAt, t.UpdatedAt, t.DueDate,
+	_, err = tx.ExecContext(ctx,
+		`INSERT INTO tasks (id, board_id, column_id, title, description, priority, labels, position, key_number, task_key, created_at, updated_at, due_date)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		t.ID, t.BoardID, t.ColumnID, t.Title, t.Description, t.Priority, t.Labels, t.Position,
+		t.KeyNumber, t.Key, t.CreatedAt, t.UpdatedAt, t.DueDate,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("insert task: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit task create: %w", err)
 	}
 	return &t, nil
 }

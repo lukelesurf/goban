@@ -31,6 +31,9 @@ func Open(path string) (*DB, error) {
 	// (ALTER TABLE fails with "duplicate column name" if already applied)
 	conn.Exec(`ALTER TABLE tasks ADD COLUMN due_date DATETIME`)
 	conn.Exec(`ALTER TABLE boards ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0`)
+	conn.Exec(`ALTER TABLE boards ADD COLUMN key TEXT NOT NULL DEFAULT ''`)
+	conn.Exec(`ALTER TABLE tasks ADD COLUMN key_number INTEGER NOT NULL DEFAULT 0`)
+	conn.Exec(`ALTER TABLE tasks ADD COLUMN task_key TEXT NOT NULL DEFAULT ''`)
 
 	return &DB{conn}, nil
 }

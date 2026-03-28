@@ -59,6 +59,51 @@ func TestBoardSetDefault_Exclusivity(t *testing.T) {
 	}
 }
 
+func TestBoardCreate_KeyGeneratedFromName(t *testing.T) {
+	tests := []struct {
+		name string
+		want string
+	}{
+		{"Goban", "GOBAN"},
+		{"My Board", "MYBOA"},
+		{"AB", "AB"},
+		{"123 Numbers!", "NUMBE"},
+		{"", "BOARD"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			boards, _, _, _ := seedBoard(t, ctx, newTestDB(t), tc.name)
+			all, err := boards.List(ctx)
+			if err != nil {
+				t.Fatalf("list boards: %v", err)
+			}
+			if all[0].Key != tc.want {
+				t.Errorf("want key %q, got %q", tc.want, all[0].Key)
+			}
+		})
+	}
+}
+
+func TestBoardCreate_KeyCollisionHandled(t *testing.T) {
+	ctx := context.Background()
+	d := newTestDB(t)
+	boards, _, _, _ := seedBoard(t, ctx, d, "Goban")
+	_, _, _, _ = seedBoard(t, ctx, d, "Goban") // same name → collision
+
+	all, err := boards.List(ctx)
+	if err != nil {
+		t.Fatalf("list boards: %v", err)
+	}
+	keys := map[string]bool{}
+	for _, b := range all {
+		if keys[b.Key] {
+			t.Errorf("duplicate key %q", b.Key)
+		}
+		keys[b.Key] = true
+	}
+}
+
 func TestBoardClearDefault(t *testing.T) {
 	ctx := context.Background()
 	d := newTestDB(t)

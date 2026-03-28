@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS boards (
 	id          TEXT PRIMARY KEY,
 	name        TEXT NOT NULL,
 	description TEXT NOT NULL DEFAULT '',
+	key         TEXT NOT NULL DEFAULT '',
 	is_default  INTEGER NOT NULL DEFAULT 0,
 	created_at  DATETIME NOT NULL,
 	updated_at  DATETIME NOT NULL
@@ -28,6 +29,8 @@ CREATE TABLE IF NOT EXISTS tasks (
 	priority     TEXT NOT NULL DEFAULT 'medium',
 	labels       TEXT NOT NULL DEFAULT '',
 	position     INTEGER NOT NULL DEFAULT 0,
+	key_number   INTEGER NOT NULL DEFAULT 0,
+	task_key     TEXT NOT NULL DEFAULT '',
 	created_at   DATETIME NOT NULL,
 	updated_at   DATETIME NOT NULL,
 	completed_at DATETIME,

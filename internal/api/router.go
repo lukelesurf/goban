@@ -21,6 +21,8 @@ func NewRouter(boards *BoardHandler, columns *ColumnHandler, tasks *TaskHandler,
 		r.Get("/boards/{id}", boards.Get)
 		r.Put("/boards/{id}", boards.Update)
 		r.Delete("/boards/{id}", boards.Delete)
+		r.Put("/boards/{id}/default", boards.SetDefault)
+		r.Delete("/boards/{id}/default", boards.ClearDefault)
 
 		r.Get("/boards/{id}/columns", columns.List)
 		r.Post("/boards/{id}/columns", columns.Create)

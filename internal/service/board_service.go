@@ -20,8 +20,14 @@ func NewBoardService(db *db.DB) *BoardService {
 	return &BoardService{db: db}
 }
 
+const boardColumns = `id, name, description, is_default, created_at, updated_at`
+
+func scanBoard(row interface{ Scan(...any) error }, b *model.Board) error {
+	return row.Scan(&b.ID, &b.Name, &b.Description, &b.IsDefault, &b.CreatedAt, &b.UpdatedAt)
+}
+
 func (s *BoardService) List(ctx context.Context) ([]model.Board, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id, name, description, created_at, updated_at FROM boards ORDER BY created_at ASC`)
+	rows, err := s.db.QueryContext(ctx, `SELECT `+boardColumns+` FROM boards ORDER BY created_at ASC`)
 	if err != nil {
 		return nil, fmt.Errorf("list boards: %w", err)
 	}
@@ -30,7 +36,7 @@ func (s *BoardService) List(ctx context.Context) ([]model.Board, error) {
 	var boards []model.Board
 	for rows.Next() {
 		var b model.Board
-		if err := rows.Scan(&b.ID, &b.Name, &b.Description, &b.CreatedAt, &b.UpdatedAt); err != nil {
+		if err := scanBoard(rows, &b); err != nil {
 			return nil, fmt.Errorf("scan board: %w", err)
 		}
 		boards = append(boards, b)
@@ -40,12 +46,35 @@ func (s *BoardService) List(ctx context.Context) ([]model.Board, error) {
 
 func (s *BoardService) Get(ctx context.Context, id string) (*model.Board, error) {
 	var b model.Board
-	err := s.db.QueryRowContext(ctx, `SELECT id, name, description, created_at, updated_at FROM boards WHERE id = ?`, id).
-		Scan(&b.ID, &b.Name, &b.Description, &b.CreatedAt, &b.UpdatedAt)
+	err := scanBoard(s.db.QueryRowContext(ctx, `SELECT `+boardColumns+` FROM boards WHERE id = ?`, id), &b)
 	if err != nil {
 		return nil, fmt.Errorf("get board %s: %w", id, err)
 	}
 	return &b, nil
+}
+
+func (s *BoardService) SetDefault(ctx context.Context, id string) (*model.Board, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(ctx, `UPDATE boards SET is_default = 0`); err != nil {
+		return nil, fmt.Errorf("clear defaults: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE boards SET is_default = 1 WHERE id = ?`, id); err != nil {
+		return nil, fmt.Errorf("set default: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit set default: %w", err)
+	}
+	return s.Get(ctx, id)
+}
+
+func (s *BoardService) ClearDefault(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE boards SET is_default = 0 WHERE id = ?`, id)
+	return err
 }
 
 func (s *BoardService) Create(ctx context.Context, name, description string) (*model.Board, error) {
@@ -65,8 +94,8 @@ func (s *BoardService) Create(ctx context.Context, name, description string) (*m
 	defer tx.Rollback()
 
 	_, err = tx.ExecContext(ctx,
-		`INSERT INTO boards (id, name, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
-		b.ID, b.Name, b.Description, b.CreatedAt, b.UpdatedAt,
+		`INSERT INTO boards (id, name, description, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		b.ID, b.Name, b.Description, b.IsDefault, b.CreatedAt, b.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("insert board: %w", err)

@@ -80,11 +80,23 @@
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <template x-for="board in boards" :key="board.id">
           <div @click="openBoard(board)"
-            class="group bg-slate-900 border border-slate-800 rounded-xl p-5 cursor-pointer hover:border-indigo-500/40 hover:bg-slate-800/50 transition-all">
-            <div class="w-8 h-1 rounded-full bg-indigo-600 mb-4 group-hover:bg-indigo-400 transition-colors"></div>
+            :class="board.is_default ? 'border-indigo-500/50 bg-slate-800/60' : 'border-slate-800 bg-slate-900 hover:border-indigo-500/40 hover:bg-slate-800/50'"
+            class="group relative rounded-xl p-5 cursor-pointer transition-all border">
+            <div class="flex items-start justify-between mb-4">
+              <div class="w-8 h-1 rounded-full bg-indigo-600 group-hover:bg-indigo-400 transition-colors"></div>
+              <button @click.stop="toggleDefault(board)"
+                :title="board.is_default ? 'Remove default' : 'Set as default'"
+                :class="board.is_default ? 'text-amber-400 hover:text-slate-500' : 'text-slate-700 hover:text-amber-400 opacity-0 group-hover:opacity-100'"
+                class="transition-all">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+              </button>
+            </div>
             <h3 class="font-semibold mb-1.5 group-hover:text-indigo-300 transition-colors" x-text="board.name"></h3>
             <p class="text-sm text-slate-400 line-clamp-2 leading-relaxed" x-text="board.description || 'No description'"></p>
-            <div class="mt-4 text-xs text-slate-600" x-text="formatDate(board.created_at)"></div>
+            <div class="mt-4 flex items-center justify-between">
+              <span class="text-xs text-slate-600" x-text="formatDate(board.created_at)"></span>
+              <span x-show="board.is_default" class="text-xs text-amber-500 font-medium">Default</span>
+            </div>
           </div>
         </template>
       </div>
@@ -463,6 +475,8 @@ function app() {
 
     async init() {
       await this.loadBoards()
+      const def = this.boards.find(b => b.is_default)
+      if (def) await this.openBoard(def)
     },
 
     initSortable(el, columnId) {
@@ -493,6 +507,17 @@ function app() {
     async loadBoards() {
       const res = await fetch('/api/v1/boards')
       this.boards = await res.json() || []
+    },
+
+    async toggleDefault(board) {
+      if (board.is_default) {
+        await fetch(`/api/v1/boards/${board.id}/default`, { method: 'DELETE' })
+        board.is_default = false
+      } else {
+        this.boards.forEach(b => { b.is_default = false })
+        await fetch(`/api/v1/boards/${board.id}/default`, { method: 'PUT' })
+        board.is_default = true
+      }
     },
 
     async openBoard(board) {

@@ -140,7 +140,10 @@
                 :data-id="task.id"
                 :class="'priority-' + task.priority"
                 class="bg-slate-800/80 rounded-lg p-3 cursor-grab hover:bg-slate-800 active:cursor-grabbing transition-all border border-slate-700/40 hover:border-slate-600/60 hover:shadow-lg hover:shadow-black/30 select-none">
-                <p class="text-sm font-medium leading-snug mb-1.5" x-text="task.title"></p>
+                <div class="flex items-baseline justify-between gap-2 mb-1.5">
+                  <p class="text-sm font-medium leading-snug" x-text="task.title"></p>
+                  <span x-show="task.key" class="text-xs text-slate-500 font-mono shrink-0" x-text="task.key"></span>
+                </div>
                 <p x-show="task.description" class="text-xs text-slate-400 line-clamp-2 leading-relaxed mb-2" x-text="task.description"></p>
                 <div class="flex items-center gap-1.5 flex-wrap mt-1">
                   <span class="text-xs px-1.5 py-0.5 rounded-full font-medium"
@@ -273,7 +276,10 @@
 
       <!-- Modal header -->
       <div class="flex items-center justify-between px-6 py-4 border-b border-slate-800/80 shrink-0 gap-4">
-        <h2 x-show="!editMode" class="text-base font-semibold leading-snug flex-1 min-w-0 truncate" x-text="selectedTask?.title"></h2>
+        <div x-show="!editMode" class="flex-1 min-w-0">
+          <span x-show="selectedTask?.key" class="text-xs text-slate-500 font-mono" x-text="selectedTask?.key"></span>
+          <h2 class="text-base font-semibold leading-snug truncate" x-text="selectedTask?.title"></h2>
+        </div>
         <input x-show="editMode" x-model="form.editTitle" type="text"
           class="flex-1 min-w-0 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm font-semibold focus:outline-none focus:border-indigo-500 transition-colors" />
 

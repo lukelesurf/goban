@@ -48,7 +48,7 @@ func newServeCmd(database *db.DB, uiAssets embed.FS) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&addr, "addr", ":8080", "address for REST API")
-	cmd.Flags().StringVar(&mcpAddr, "mcp-addr", ":9090", "address for MCP server")
+	cmd.Flags().StringVar(&addr, "addr", ":8081", "address for REST API")
+	cmd.Flags().StringVar(&mcpAddr, "mcp-addr", ":9091", "address for MCP server")
 	return cmd
 }

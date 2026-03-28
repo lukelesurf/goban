@@ -106,7 +106,7 @@
   <!-- ───────────────── Board View ───────────────── -->
   <div x-show="view === 'board'" class="flex flex-col h-screen">
     <header class="sticky top-0 z-10 border-b border-slate-800/60 px-6 py-3.5 flex items-center gap-2 shrink-0 bg-slate-950/80 backdrop-blur">
-      <button @click="view = 'boards'"
+      <button @click="localStorage.removeItem('goban-board'); view = 'boards'"
         class="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-300 transition-colors rounded px-2 py-1 hover:bg-slate-800/60">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
         Boards
@@ -481,6 +481,9 @@ function app() {
 
     async init() {
       await this.loadBoards()
+      const savedId = localStorage.getItem('goban-board')
+      const saved = savedId && this.boards.find(b => b.id === savedId)
+      if (saved) return await this.openBoard(saved)
       const def = this.boards.find(b => b.is_default)
       if (def) await this.openBoard(def)
     },
@@ -530,6 +533,7 @@ function app() {
       this._sortables.forEach(s => s.destroy())
       this._sortables = []
       this.currentBoard = board
+      localStorage.setItem('goban-board', board.id)
       const res = await fetch(`/api/v1/boards/${board.id}`)
       const data = await res.json()
       this.columns = data.columns || []

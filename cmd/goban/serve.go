@@ -4,6 +4,7 @@ import (
 	"embed"
 	"fmt"
 	"net/http"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/lukelesurf/goban/internal/api"
@@ -23,13 +24,16 @@ func newServeCmd(database *db.DB, uiAssets embed.FS) *cobra.Command {
 			boards := service.NewBoardService(database)
 			columns := service.NewColumnService(database)
 			tasks := service.NewTaskService(database)
+			storageDir := filepath.Join(filepath.Dir(dbPath), "attachments")
+			attachments := service.NewAttachmentService(database, storageDir)
 
-			mcpServer := gobanmcp.NewServer(boards, columns, tasks)
+			mcpServer := gobanmcp.NewServer(boards, columns, tasks, attachments)
 
 			router := api.NewRouter(
 				api.NewBoardHandler(boards, columns, tasks),
 				api.NewColumnHandler(columns),
-				api.NewTaskHandler(tasks),
+				api.NewTaskHandler(tasks, attachments),
+				api.NewAttachmentHandler(attachments),
 				uiAssets,
 			)
 

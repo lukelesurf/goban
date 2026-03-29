@@ -45,5 +45,15 @@ CREATE TABLE IF NOT EXISTS comments (
 	created_at DATETIME NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS attachments (
+	id           TEXT PRIMARY KEY,
+	task_id      TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+	filename     TEXT NOT NULL,
+	storage_path TEXT NOT NULL,
+	size         INTEGER NOT NULL,
+	content_type TEXT NOT NULL DEFAULT '',
+	created_at   DATETIME NOT NULL
+);
+
 PRAGMA foreign_keys = ON;
 `

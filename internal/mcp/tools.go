@@ -11,7 +11,7 @@ import (
 	"github.com/lukelesurf/goban/internal/service"
 )
 
-func registerTools(s *server.MCPServer, boards *service.BoardService, columns *service.ColumnService, tasks *service.TaskService) {
+func registerTools(s *server.MCPServer, boards *service.BoardService, columns *service.ColumnService, tasks *service.TaskService, attachments *service.AttachmentService) {
 	s.AddTool(mcp.NewTool("list_boards",
 		mcp.WithDescription("List all kanban boards"),
 	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -111,7 +111,7 @@ func registerTools(s *server.MCPServer, boards *service.BoardService, columns *s
 	})
 
 	s.AddTool(mcp.NewTool("get_task",
-		mcp.WithDescription("Get full task detail including comments"),
+		mcp.WithDescription("Get full task detail including comments and attachments"),
 		mcp.WithString("task_id", mcp.Required(), mcp.Description("Task ID")),
 	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		taskID, err := req.RequireString("task_id")
@@ -126,7 +126,11 @@ func registerTools(s *server.MCPServer, boards *service.BoardService, columns *s
 		if err != nil {
 			return nil, err
 		}
-		return jsonResult(map[string]any{"task": t, "comments": comments})
+		atts, err := attachments.List(ctx, taskID)
+		if err != nil {
+			return nil, err
+		}
+		return jsonResult(map[string]any{"task": t, "comments": comments, "attachments": atts})
 	})
 
 	s.AddTool(mcp.NewTool("update_task",
@@ -245,6 +249,46 @@ func registerTools(s *server.MCPServer, boards *service.BoardService, columns *s
 			return nil, err
 		}
 		return jsonResult(ts)
+	})
+
+	s.AddTool(mcp.NewTool("attach_file",
+		mcp.WithDescription("Attach a text file to a task. Pass the file content as a string — ideal for specs, notes, configs, etc."),
+		mcp.WithString("task_id", mcp.Required(), mcp.Description("Task ID")),
+		mcp.WithString("filename", mcp.Required(), mcp.Description("Filename including extension (e.g. spec.md)")),
+		mcp.WithString("content", mcp.Required(), mcp.Description("File content as text")),
+	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		taskID, err := req.RequireString("task_id")
+		if err != nil {
+			return nil, err
+		}
+		filename, err := req.RequireString("filename")
+		if err != nil {
+			return nil, err
+		}
+		content, err := req.RequireString("content")
+		if err != nil {
+			return nil, err
+		}
+		att, err := attachments.UploadFromString(ctx, taskID, filename, content)
+		if err != nil {
+			return nil, err
+		}
+		return jsonResult(att)
+	})
+
+	s.AddTool(mcp.NewTool("list_attachments",
+		mcp.WithDescription("List file attachments on a task"),
+		mcp.WithString("task_id", mcp.Required(), mcp.Description("Task ID")),
+	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		taskID, err := req.RequireString("task_id")
+		if err != nil {
+			return nil, err
+		}
+		atts, err := attachments.List(ctx, taskID)
+		if err != nil {
+			return nil, err
+		}
+		return jsonResult(atts)
 	})
 
 	s.AddTool(mcp.NewTool("get_board_summary",

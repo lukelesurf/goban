@@ -9,7 +9,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-func NewRouter(boards *BoardHandler, columns *ColumnHandler, tasks *TaskHandler, ui embed.FS) *chi.Mux {
+func NewRouter(boards *BoardHandler, columns *ColumnHandler, tasks *TaskHandler, attachments *AttachmentHandler, ui embed.FS) *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Use(middleware.Logger)
@@ -37,6 +37,10 @@ func NewRouter(boards *BoardHandler, columns *ColumnHandler, tasks *TaskHandler,
 		r.Post("/tasks/{id}/move", tasks.Move)
 		r.Get("/tasks/{id}/comments", tasks.ListComments)
 		r.Post("/tasks/{id}/comments", tasks.AddComment)
+		r.Get("/tasks/{id}/attachments", attachments.List)
+		r.Post("/tasks/{id}/attachments", attachments.Upload)
+		r.Get("/attachments/{id}/download", attachments.Download)
+		r.Delete("/attachments/{id}", attachments.Delete)
 	})
 
 	// Serve embedded UI at root

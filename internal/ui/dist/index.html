@@ -329,6 +329,34 @@
               <p x-show="!selectedTask?.description" class="text-xs text-slate-600 italic">No description.</p>
             </div>
 
+            <div class="mb-6">
+              <h3 class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">Attachments</h3>
+              <div class="flex flex-col gap-2 mb-3">
+                <template x-for="att in selectedTaskAttachments" :key="att.id">
+                  <div class="flex items-center justify-between bg-slate-800/60 rounded-lg px-3 py-2 border border-slate-700/40">
+                    <a :href="'/api/v1/attachments/' + att.id + '/download'" target="_blank"
+                      class="flex items-center gap-2 text-sm text-indigo-400 hover:text-indigo-300 truncate min-w-0">
+                      <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+                      <span class="truncate" x-text="att.filename"></span>
+                    </a>
+                    <div class="flex items-center gap-2 shrink-0 ml-2">
+                      <span class="text-xs text-slate-500" x-text="formatFileSize(att.size)"></span>
+                      <button @click="deleteAttachment(att.id)"
+                        class="text-slate-600 hover:text-red-400 transition-colors p-0.5">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                </template>
+                <p x-show="selectedTaskAttachments.length === 0" class="text-xs text-slate-600 italic">No attachments.</p>
+              </div>
+              <label class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-xs text-slate-400 hover:text-slate-200 cursor-pointer transition-colors">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+                Attach file
+                <input type="file" class="hidden" @change="uploadAttachment($event)" />
+              </label>
+            </div>
+
             <h3 class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">Comments</h3>
             <div class="flex flex-col gap-3 mb-4">
               <template x-for="comment in selectedTaskComments" :key="comment.id">
@@ -476,6 +504,7 @@ function app() {
     tasks: [],
     selectedTask: null,
     selectedTaskComments: [],
+    selectedTaskAttachments: [],
     form: {},
     _sortables: [],
 
@@ -591,6 +620,7 @@ function app() {
       if (task._dragging) return
       this.selectedTask = task
       this.selectedTaskComments = []
+      this.selectedTaskAttachments = []
       this.editMode = false
       this.previewMd = false
       this.form = { commentBody: '' }
@@ -598,6 +628,7 @@ function app() {
       const data = await res.json()
       this.selectedTask = data.task
       this.selectedTaskComments = data.comments || []
+      this.selectedTaskAttachments = data.attachments || []
       this.modal = 'task'
     },
 
@@ -644,6 +675,37 @@ function app() {
       const res = await fetch(`/api/v1/tasks/${this.selectedTask.id}`)
       const data = await res.json()
       this.selectedTaskComments = data.comments || []
+    },
+
+    async uploadAttachment(event) {
+      const file = event.target.files[0]
+      if (!file) return
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch(`/api/v1/tasks/${this.selectedTask.id}/attachments`, {
+        method: 'POST',
+        body: formData,
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        alert(err.error || 'Upload failed')
+        return
+      }
+      event.target.value = ''
+      const taskRes = await fetch(`/api/v1/tasks/${this.selectedTask.id}`)
+      const data = await taskRes.json()
+      this.selectedTaskAttachments = data.attachments || []
+    },
+
+    async deleteAttachment(id) {
+      await fetch(`/api/v1/attachments/${id}`, { method: 'DELETE' })
+      this.selectedTaskAttachments = this.selectedTaskAttachments.filter(a => a.id !== id)
+    },
+
+    formatFileSize(bytes) {
+      if (bytes < 1024) return bytes + ' B'
+      if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'
+      return (bytes / 1048576).toFixed(1) + ' MB'
     },
 
     async deleteTask() {

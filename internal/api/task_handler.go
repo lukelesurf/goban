@@ -13,11 +13,12 @@ import (
 )
 
 type TaskHandler struct {
-	tasks *service.TaskService
+	tasks       *service.TaskService
+	attachments *service.AttachmentService
 }
 
-func NewTaskHandler(tasks *service.TaskService) *TaskHandler {
-	return &TaskHandler{tasks: tasks}
+func NewTaskHandler(tasks *service.TaskService, attachments *service.AttachmentService) *TaskHandler {
+	return &TaskHandler{tasks: tasks, attachments: attachments}
 }
 
 func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -54,9 +55,16 @@ func (h *TaskHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	attachments, err := h.attachments.List(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
-		"task":     task,
-		"comments": comments,
+		"task":        task,
+		"comments":    comments,
+		"attachments": attachments,
 	})
 }
 
@@ -175,6 +183,7 @@ func (h *TaskHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	h.attachments.DeleteAllForTask(r.Context(), id)
 	w.WriteHeader(http.StatusNoContent)
 }
 

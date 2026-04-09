@@ -61,16 +61,36 @@ func (s *BoardService) List(ctx context.Context) ([]model.Board, error) {
 	return boards, rows.Err()
 }
 
-func (s *BoardService) Get(ctx context.Context, id string) (*model.Board, error) {
-	var b model.Board
-	err := scanBoard(s.db.QueryRowContext(ctx, `SELECT `+boardColumns+` FROM boards WHERE id = ?`, id), &b)
+// resolveID accepts either a UUID or a board key (e.g. "YEETT") and returns
+// the canonical UUID.
+func (s *BoardService) resolveID(ctx context.Context, idOrKey string) (string, error) {
+	var id string
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id FROM boards WHERE id = ? OR key = ?`, idOrKey, idOrKey,
+	).Scan(&id)
 	if err != nil {
-		return nil, fmt.Errorf("get board %s: %w", id, err)
+		return "", fmt.Errorf("board %q: %w", idOrKey, err)
+	}
+	return id, nil
+}
+
+func (s *BoardService) Get(ctx context.Context, idOrKey string) (*model.Board, error) {
+	var b model.Board
+	err := scanBoard(s.db.QueryRowContext(ctx,
+		`SELECT `+boardColumns+` FROM boards WHERE id = ? OR key = ?`, idOrKey, idOrKey,
+	), &b)
+	if err != nil {
+		return nil, fmt.Errorf("get board %s: %w", idOrKey, err)
 	}
 	return &b, nil
 }
 
-func (s *BoardService) SetDefault(ctx context.Context, id string) (*model.Board, error) {
+func (s *BoardService) SetDefault(ctx context.Context, idOrKey string) (*model.Board, error) {
+	id, err := s.resolveID(ctx, idOrKey)
+	if err != nil {
+		return nil, err
+	}
+
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("begin tx: %w", err)
@@ -89,8 +109,12 @@ func (s *BoardService) SetDefault(ctx context.Context, id string) (*model.Board,
 	return s.Get(ctx, id)
 }
 
-func (s *BoardService) ClearDefault(ctx context.Context, id string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE boards SET is_default = 0 WHERE id = ?`, id)
+func (s *BoardService) ClearDefault(ctx context.Context, idOrKey string) error {
+	id, err := s.resolveID(ctx, idOrKey)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, `UPDATE boards SET is_default = 0 WHERE id = ?`, id)
 	return err
 }
 
@@ -149,9 +173,13 @@ func (s *BoardService) Create(ctx context.Context, name, description string) (*m
 	return &b, nil
 }
 
-func (s *BoardService) Update(ctx context.Context, id, name, description string) (*model.Board, error) {
+func (s *BoardService) Update(ctx context.Context, idOrKey, name, description string) (*model.Board, error) {
+	id, err := s.resolveID(ctx, idOrKey)
+	if err != nil {
+		return nil, err
+	}
 	now := time.Now().UTC()
-	_, err := s.db.ExecContext(ctx,
+	_, err = s.db.ExecContext(ctx,
 		`UPDATE boards SET name = ?, description = ?, updated_at = ? WHERE id = ?`,
 		name, description, now, id,
 	)
@@ -161,8 +189,12 @@ func (s *BoardService) Update(ctx context.Context, id, name, description string)
 	return s.Get(ctx, id)
 }
 
-func (s *BoardService) Delete(ctx context.Context, id string) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM boards WHERE id = ?`, id)
+func (s *BoardService) Delete(ctx context.Context, idOrKey string) error {
+	id, err := s.resolveID(ctx, idOrKey)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, `DELETE FROM boards WHERE id = ?`, id)
 	if err != nil {
 		return fmt.Errorf("delete board %s: %w", id, err)
 	}

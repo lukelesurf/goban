@@ -34,7 +34,11 @@ func scanTask(row interface{ Scan(...any) error }, t *model.Task) error {
 		&t.CreatedAt, &t.UpdatedAt, &t.CompletedAt, &t.DueDate)
 }
 
-func (s *TaskService) List(ctx context.Context, boardID string, f TaskFilter) ([]model.Task, error) {
+func (s *TaskService) List(ctx context.Context, boardIDOrKey string, f TaskFilter) ([]model.Task, error) {
+	boardID, err := s.resolveBoardID(ctx, boardIDOrKey)
+	if err != nil {
+		return nil, err
+	}
 	q := `SELECT ` + taskColumns + ` FROM tasks WHERE board_id = ?`
 	args := []any{boardID}
 
@@ -74,6 +78,19 @@ func (s *TaskService) List(ctx context.Context, boardID string, f TaskFilter) ([
 	return tasks, rows.Err()
 }
 
+// resolveBoardID accepts either a UUID or a board key (e.g. "YEETT") and
+// returns the canonical board UUID.
+func (s *TaskService) resolveBoardID(ctx context.Context, idOrKey string) (string, error) {
+	var id string
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id FROM boards WHERE id = ? OR key = ?`, idOrKey, idOrKey,
+	).Scan(&id)
+	if err != nil {
+		return "", fmt.Errorf("board %q: %w", idOrKey, err)
+	}
+	return id, nil
+}
+
 // resolveID accepts either a UUID or a task key (e.g. "BOARD-14") and returns
 // the canonical UUID.
 func (s *TaskService) resolveID(ctx context.Context, idOrKey string) (string, error) {
@@ -106,7 +123,11 @@ type TaskCreate struct {
 	DueDate     *time.Time
 }
 
-func (s *TaskService) Create(ctx context.Context, boardID string, c TaskCreate) (*model.Task, error) {
+func (s *TaskService) Create(ctx context.Context, boardIDOrKey string, c TaskCreate) (*model.Task, error) {
+	boardID, err := s.resolveBoardID(ctx, boardIDOrKey)
+	if err != nil {
+		return nil, err
+	}
 	if c.Priority == "" {
 		c.Priority = model.PriorityMedium
 	}

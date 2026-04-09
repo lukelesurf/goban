@@ -49,13 +49,13 @@ func (h *TaskHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	comments, err := h.tasks.ListComments(r.Context(), id)
+	comments, err := h.tasks.ListComments(r.Context(), task.ID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	attachments, err := h.attachments.List(r.Context(), id)
+	attachments, err := h.attachments.List(r.Context(), task.ID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -179,11 +179,20 @@ func (h *TaskHandler) Move(w http.ResponseWriter, r *http.Request) {
 
 func (h *TaskHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	if err := h.tasks.Delete(r.Context(), id); err != nil {
+	task, err := h.tasks.Get(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "task not found")
+			return
+		}
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	h.attachments.DeleteAllForTask(r.Context(), id)
+	if err := h.tasks.Delete(r.Context(), task.ID); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	h.attachments.DeleteAllForTask(r.Context(), task.ID)
 	w.WriteHeader(http.StatusNoContent)
 }
 

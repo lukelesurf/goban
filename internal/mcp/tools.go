@@ -122,11 +122,11 @@ func registerTools(s *server.MCPServer, boards *service.BoardService, columns *s
 		if err != nil {
 			return nil, err
 		}
-		comments, err := tasks.ListComments(ctx, taskID)
+		comments, err := tasks.ListComments(ctx, t.ID)
 		if err != nil {
 			return nil, err
 		}
-		atts, err := attachments.List(ctx, taskID)
+		atts, err := attachments.List(ctx, t.ID)
 		if err != nil {
 			return nil, err
 		}

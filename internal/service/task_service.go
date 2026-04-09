@@ -74,13 +74,26 @@ func (s *TaskService) List(ctx context.Context, boardID string, f TaskFilter) ([
 	return tasks, rows.Err()
 }
 
-func (s *TaskService) Get(ctx context.Context, id string) (*model.Task, error) {
+// resolveID accepts either a UUID or a task key (e.g. "BOARD-14") and returns
+// the canonical UUID.
+func (s *TaskService) resolveID(ctx context.Context, idOrKey string) (string, error) {
+	var id string
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id FROM tasks WHERE id = ? OR task_key = ?`, idOrKey, idOrKey,
+	).Scan(&id)
+	if err != nil {
+		return "", fmt.Errorf("task %q: %w", idOrKey, err)
+	}
+	return id, nil
+}
+
+func (s *TaskService) Get(ctx context.Context, idOrKey string) (*model.Task, error) {
 	var t model.Task
 	err := scanTask(s.db.QueryRowContext(ctx,
-		`SELECT `+taskColumns+` FROM tasks WHERE id = ?`, id,
+		`SELECT `+taskColumns+` FROM tasks WHERE id = ? OR task_key = ?`, idOrKey, idOrKey,
 	), &t)
 	if err != nil {
-		return nil, fmt.Errorf("get task %s: %w", id, err)
+		return nil, fmt.Errorf("get task %s: %w", idOrKey, err)
 	}
 	return &t, nil
 }
@@ -167,7 +180,12 @@ type TaskUpdate struct {
 	ClearDueDate bool
 }
 
-func (s *TaskService) Update(ctx context.Context, id string, u TaskUpdate) (*model.Task, error) {
+func (s *TaskService) Update(ctx context.Context, idOrKey string, u TaskUpdate) (*model.Task, error) {
+	id, err := s.resolveID(ctx, idOrKey)
+	if err != nil {
+		return nil, err
+	}
+
 	setClauses := []string{"updated_at = ?"}
 	args := []any{time.Now().UTC()}
 
@@ -195,7 +213,7 @@ func (s *TaskService) Update(ctx context.Context, id string, u TaskUpdate) (*mod
 	}
 
 	args = append(args, id)
-	_, err := s.db.ExecContext(ctx,
+	_, err = s.db.ExecContext(ctx,
 		`UPDATE tasks SET `+strings.Join(setClauses, ", ")+` WHERE id = ?`,
 		args...,
 	)
@@ -205,9 +223,14 @@ func (s *TaskService) Update(ctx context.Context, id string, u TaskUpdate) (*mod
 	return s.Get(ctx, id)
 }
 
-func (s *TaskService) Move(ctx context.Context, taskID, columnID string, position int) (*model.Task, error) {
+func (s *TaskService) Move(ctx context.Context, idOrKey, columnID string, position int) (*model.Task, error) {
+	taskID, err := s.resolveID(ctx, idOrKey)
+	if err != nil {
+		return nil, err
+	}
+
 	var lastColumnID string
-	err := s.db.QueryRowContext(ctx,
+	err = s.db.QueryRowContext(ctx,
 		`SELECT id FROM columns WHERE board_id = (SELECT board_id FROM tasks WHERE id = ?) ORDER BY position DESC LIMIT 1`,
 		taskID,
 	).Scan(&lastColumnID)
@@ -230,15 +253,23 @@ func (s *TaskService) Move(ctx context.Context, taskID, columnID string, positio
 	return s.Get(ctx, taskID)
 }
 
-func (s *TaskService) Delete(ctx context.Context, id string) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM tasks WHERE id = ?`, id)
+func (s *TaskService) Delete(ctx context.Context, idOrKey string) error {
+	id, err := s.resolveID(ctx, idOrKey)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, `DELETE FROM tasks WHERE id = ?`, id)
 	if err != nil {
 		return fmt.Errorf("delete task %s: %w", id, err)
 	}
 	return nil
 }
 
-func (s *TaskService) AddComment(ctx context.Context, taskID, author, body string) (*model.Comment, error) {
+func (s *TaskService) AddComment(ctx context.Context, idOrKey, author, body string) (*model.Comment, error) {
+	taskID, err := s.resolveID(ctx, idOrKey)
+	if err != nil {
+		return nil, err
+	}
 	if author == "" {
 		author = "claude"
 	}
@@ -249,7 +280,7 @@ func (s *TaskService) AddComment(ctx context.Context, taskID, author, body strin
 		Body:      body,
 		CreatedAt: time.Now().UTC(),
 	}
-	_, err := s.db.ExecContext(ctx,
+	_, err = s.db.ExecContext(ctx,
 		`INSERT INTO comments (id, task_id, author, body, created_at) VALUES (?, ?, ?, ?, ?)`,
 		c.ID, c.TaskID, c.Author, c.Body, c.CreatedAt,
 	)
@@ -259,7 +290,11 @@ func (s *TaskService) AddComment(ctx context.Context, taskID, author, body strin
 	return &c, nil
 }
 
-func (s *TaskService) ListComments(ctx context.Context, taskID string) ([]model.Comment, error) {
+func (s *TaskService) ListComments(ctx context.Context, idOrKey string) ([]model.Comment, error) {
+	taskID, err := s.resolveID(ctx, idOrKey)
+	if err != nil {
+		return nil, err
+	}
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, task_id, author, body, created_at FROM comments WHERE task_id = ? ORDER BY created_at ASC`,
 		taskID,

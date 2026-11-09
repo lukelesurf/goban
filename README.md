@@ -8,7 +8,8 @@ Go binary on SQLite, and it serves three things from the same service layer:
 - an MCP server over streamable HTTP, so Claude Code can read and move the same
   tasks I'm looking at
 
-It's named after the board Go is played on: a board, for boards, written in Go.
+The name is Go plus kanban. It also turns out to be the word for the board the
+game of Go is played on, which suits a board for boards.
 
 Every other project on my home server keeps its tickets here. When Claude Code
 picks up a ticket it moves the card to In Progress, comments on what it found,

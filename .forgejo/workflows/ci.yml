@@ -1,0 +1,21 @@
+# Same checks as .github/workflows/ci.yml, on a Forgejo runner. Test only.
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: docker
+    container:
+      image: golang:1.26-alpine
+    steps:
+      - name: Install build deps
+        run: apk add --no-cache gcc musl-dev nodejs
+      - uses: actions/checkout@v4
+      - name: Vet
+        run: CGO_ENABLED=1 go vet ./...
+      - name: Test
+        run: CGO_ENABLED=1 go test ./...

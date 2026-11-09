@@ -19,4 +19,5 @@ COPY --from=builder /app/goban /usr/local/bin/goban
 EXPOSE 8080 9090
 
 ENTRYPOINT ["goban"]
-CMD ["--db", "/data/goban.db", "serve"]
+# serve defaults to the dev ports (:8081/:9091), so name the published ones
+CMD ["--db", "/data/goban.db", "serve", "--addr", ":8080", "--mcp-addr", ":9090"]

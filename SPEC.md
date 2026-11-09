@@ -1,13 +1,19 @@
-# Goban — A Self-Hosted Kanban Board with MCP Server
+# Goban: a self-hosted kanban board with an MCP server
 
-> A lightweight, self-hosted kanban board written in Go. Named for the board used to play the game of Go — a board for managing boards, written in Go. Designed for both human use (via web UI) and AI agent use (via MCP server). Runs as a single binary with embedded assets and SQLite storage.
+> This is the spec goban was built from, kept as it was written. The code has
+> moved on in places: configuration is command-line flags, not the `GOBAN_*`
+> environment variables below, and due dates, attachments and task keys were
+> added once the board was in daily use. Where the two disagree, the code and
+> the [README](README.md) are right.
+
+> A lightweight, self-hosted kanban board written in Go. Named for the board used to play the game of Go: a board for managing boards, written in Go. Designed for both human use (via web UI) and AI agent use (via MCP server). Runs as a single binary with embedded assets and SQLite storage.
 
 ## Overview
 
 Goban is a personal/small-team kanban board that prioritises simplicity and API-first design. The primary consumers are:
 
-1. **Luke** — via a web UI for visual board management
-2. **Claude Code** — via an MCP server for programmatic task creation, movement, and querying
+1. **Luke**: via a web UI for visual board management
+2. **Claude Code**: via an MCP server for programmatic task creation, movement, and querying
 
 The system runs on a home server and is accessed remotely from a workstation where Claude Code operates.
 
@@ -99,33 +105,33 @@ Default columns on board creation: `To Do`, `In Progress`, `Review`, `Done`
 Base path: `/api/v1`
 
 ### Boards
-- `GET    /boards`              — List all boards
-- `POST   /boards`              — Create board
-- `GET    /boards/:id`          — Get board with columns and task counts
-- `PUT    /boards/:id`          — Update board
-- `DELETE /boards/:id`          — Delete board and all children
+- `GET    /boards`: List all boards
+- `POST   /boards`: Create board
+- `GET    /boards/:id`: Get board with columns and task counts
+- `PUT    /boards/:id`: Update board
+- `DELETE /boards/:id`: Delete board and all children
 
 ### Columns
-- `GET    /boards/:id/columns`         — List columns for board
-- `POST   /boards/:id/columns`         — Add column
-- `PUT    /columns/:id`                — Update column (name, position, wip_limit)
-- `DELETE /columns/:id`                — Delete column (must be empty or reassign tasks)
+- `GET    /boards/:id/columns`: List columns for board
+- `POST   /boards/:id/columns`: Add column
+- `PUT    /columns/:id`: Update column (name, position, wip_limit)
+- `DELETE /columns/:id`: Delete column (must be empty or reassign tasks)
 
 ### Tasks
-- `GET    /boards/:id/tasks`           — List tasks (filterable by column, priority, label)
-- `POST   /boards/:id/tasks`           — Create task (defaults to first column)
-- `GET    /tasks/:id`                  — Get task with comments
-- `PUT    /tasks/:id`                  — Update task fields
-- `DELETE /tasks/:id`                  — Delete task
-- `POST   /tasks/:id/move`            — Move task to column (with position). Body: `{"column_id": "...", "position": 0}`
-- `GET    /tasks/:id/comments`         — List comments
-- `POST   /tasks/:id/comments`         — Add comment
+- `GET    /boards/:id/tasks`: List tasks (filterable by column, priority, label)
+- `POST   /boards/:id/tasks`: Create task (defaults to first column)
+- `GET    /tasks/:id`: Get task with comments
+- `PUT    /tasks/:id`: Update task fields
+- `DELETE /tasks/:id`: Delete task
+- `POST   /tasks/:id/move`: Move task to column (with position). Body: `{"column_id": "...", "position": 0}`
+- `GET    /tasks/:id/comments`: List comments
+- `POST   /tasks/:id/comments`: Add comment
 
 ### Query Parameters (for task listing)
-- `column_id` — filter by column
-- `priority`  — filter by priority
-- `label`     — filter by label (contains match)
-- `search`    — full-text search on title and description
+- `column_id`: filter by column
+- `priority`: filter by priority
+- `label`: filter by label (contains match)
+- `search`: full-text search on title and description
 
 ## MCP Server
 
@@ -178,7 +184,7 @@ All tool responses should return well-structured JSON that Claude can reason abo
 
 ## Web UI
 
-A minimal, functional web UI embedded in the binary. Not trying to win design awards — just needs to be usable.
+A minimal, functional web UI embedded in the binary. Not trying to win design awards. It just needs to be usable.
 
 ### Tech Stack
 - Vanilla HTML/CSS/JS or Alpine.js + Tailwind (via CDN in dev, embedded in prod)
@@ -186,9 +192,9 @@ A minimal, functional web UI embedded in the binary. Not trying to win design aw
 - Go `html/template` for server-rendered pages, or a small SPA with fetch calls to the REST API
 
 ### Views
-1. **Board List** — cards showing each board with task count summary
-2. **Board View** — columnar kanban layout with tasks as cards, drag to move
-3. **Task Detail** — slide-out or modal with full description, comments, edit form
+1. **Board List**: cards showing each board with task count summary
+2. **Board View**: columnar kanban layout with tasks as cards, drag to move
+3. **Task Detail**: slide-out or modal with full description, comments, edit form
 
 ### Embedded Assets
 ```go
